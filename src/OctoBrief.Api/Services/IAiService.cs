@@ -1,4 +1,4 @@
-using OctoBrief.Api.Controllers;
+using OctoBrief.Api.Models;
 
 namespace OctoBrief.Api.Services;
 

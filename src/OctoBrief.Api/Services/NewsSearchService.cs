@@ -366,7 +366,6 @@ public class NewsSearchService : INewsSearchService
       ["science"] = [
         new("Descopera.ro", "https://www.descopera.ro", false, "Romania"),
         new("HotNews Știință", "https://hotnews.ro/c/science", false, "Romania"),
-        new("Digi24 Știință", "https://www.digi24.ro/stiri/sci-tech", false, "Romania"),
       ],
       ["sports"] = [
         new("GSP.ro", "https://www.gsp.ro", false, "Romania"),

@@ -1,54 +1,18 @@
-import { CreatePreferenceDto, MonitoringPreference, WebsiteSummary } from './types'
+import {
+  CreatePreferenceDto,
+  MonitoringPreference,
+  WebsiteSummary,
+  ConfigStatus,
+  ScrapeTestResult,
+  AiTestResult,
+  EmailTestResult,
+  FullTestResult,
+  GenerateBriefResponse,
+  PreviewBriefResponse,
+  SendEmailResponse,
+} from './types'
 
 const API_BASE = '/api'
-
-// Test API types
-export interface ConfigStatus {
-  openAiConfigured: boolean
-  emailConfigured: boolean
-  smtpHost: string
-  smtpPort: string
-}
-
-export interface ScrapeTestResult {
-  success: boolean
-  error?: string
-  message: string
-  title?: string
-  headlinesFound: number
-  headlines: string[]
-  contentLength: number
-  contentPreview?: string
-  elapsedMs: number
-}
-
-export interface AiTestResult {
-  success: boolean
-  error?: string
-  message: string
-  usingFallback: boolean
-  overview?: string
-  headlineCount: number
-  headlines: { title: string; summary: string; sourceUrl: string }[]
-  scrapeElapsedMs: number
-  aiElapsedMs: number
-}
-
-export interface EmailTestResult {
-  success: boolean
-  error?: string
-  message: string
-  hint?: string
-  sentTo?: string
-  elapsedMs: number
-}
-
-export interface FullTestResult {
-  success: boolean
-  message: string
-  steps: { name: string; status: string; elapsedMs: number; details?: string }[]
-  preview?: { title: string; overview: string; headlines: string[] }
-}
 
 export const api = {
   // Preferences
@@ -164,16 +128,6 @@ export const api = {
     return response.json()
   },
 
-  // Brief generation (one-time)
-  async generateBrief(email: string, topic: string, country: string = 'global'): Promise<GenerateBriefResponse> {
-    const response = await fetch(`${API_BASE}/brief/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, topic, country }),
-    })
-    return response.json()
-  },
-
   async previewBrief(topic: string, country: string = 'global'): Promise<PreviewBriefResponse> {
     const response = await fetch(`${API_BASE}/brief/preview`, {
       method: 'POST',
@@ -193,39 +147,15 @@ export const api = {
   },
 }
 
-// Brief types
-export interface GenerateBriefResponse {
-  success: boolean
-  message: string
-  subject?: string
-  websiteResults?: WebsiteBriefResult[]
-  totalHeadlines?: number
-  topic?: string
-  country?: string
-  error?: string
-}
-
-export interface PreviewBriefResponse {
-  success: boolean
-  subject?: string
-  htmlContent?: string
-  websiteResults?: WebsiteBriefResult[]
-  totalHeadlines?: number
-  topic?: string
-  country?: string
-  message?: string
-}
-
-export interface WebsiteBriefResult {
-  url: string
-  websiteName: string
-  success: boolean
-  headlinesFound: number
-  isMajorOutlet?: boolean
-  error?: string
-}
-
-export interface SendEmailResponse {
-  success: boolean
-  message: string
-}
+// Re-export types for convenience
+export type {
+  PreviewBriefResponse,
+  GenerateBriefResponse,
+  SendEmailResponse,
+  WebsiteBriefResult,
+  ConfigStatus,
+  ScrapeTestResult,
+  AiTestResult,
+  EmailTestResult,
+  FullTestResult,
+} from './types'
