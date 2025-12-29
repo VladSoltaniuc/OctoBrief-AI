@@ -24,13 +24,36 @@ node_modules/
 *~
 .DS_Store
 
-# Environment
-.env
-.env.local
-.env.*.local
-appsettings.*.json
-!appsettings.json
-!appsettings.Development.json
+# Environment & Secrets - NEVER COMMIT THESE (ANYWHERE in project)
+**/.env
+**/.env.*
+**/*.env
+**/.env.local
+**/.env.*.local
+**/appsettings.json
+**/appsettings.*.json
+**/appsettings.Development.json
+**/appsettings.Production.json
+**/appsettings.Local.json
+**/secrets.json
+**/*.secrets
+**/*.key
+**/*.pem
+**/*.pfx
+**/*.p12
+**/credentials.json
+**/service-account*.json
+**/firebase*.json
+**/google-credentials*.json
+**/Web.config
+**/web.config
+**/*.config.json
+**/config.json
+**/*credentials*
+**/*secret*
+**/*password*.txt
+**/*email*.txt
+**/*api*key*.txt
 
 # Logs
 *.log

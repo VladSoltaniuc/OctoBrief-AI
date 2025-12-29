@@ -163,4 +163,69 @@ export const api = {
     if (!response.ok) throw new Error('Failed to run full test')
     return response.json()
   },
+
+  // Brief generation (one-time)
+  async generateBrief(email: string, topic: string, country: string = 'global'): Promise<GenerateBriefResponse> {
+    const response = await fetch(`${API_BASE}/brief/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, topic, country }),
+    })
+    return response.json()
+  },
+
+  async previewBrief(topic: string, country: string = 'global'): Promise<PreviewBriefResponse> {
+    const response = await fetch(`${API_BASE}/brief/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, country }),
+    })
+    return response.json()
+  },
+
+  async sendBriefToEmail(email: string, subject: string, htmlContent: string): Promise<SendEmailResponse> {
+    const response = await fetch(`${API_BASE}/brief/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, subject, htmlContent }),
+    })
+    return response.json()
+  },
+}
+
+// Brief types
+export interface GenerateBriefResponse {
+  success: boolean
+  message: string
+  subject?: string
+  websiteResults?: WebsiteBriefResult[]
+  totalHeadlines?: number
+  topic?: string
+  country?: string
+  error?: string
+}
+
+export interface PreviewBriefResponse {
+  success: boolean
+  subject?: string
+  htmlContent?: string
+  websiteResults?: WebsiteBriefResult[]
+  totalHeadlines?: number
+  topic?: string
+  country?: string
+  message?: string
+}
+
+export interface WebsiteBriefResult {
+  url: string
+  websiteName: string
+  success: boolean
+  headlinesFound: number
+  isMajorOutlet?: boolean
+  error?: string
+}
+
+export interface SendEmailResponse {
+  success: boolean
+  message: string
 }
