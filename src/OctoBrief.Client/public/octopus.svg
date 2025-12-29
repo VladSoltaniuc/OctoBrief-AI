@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4f46e5;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="40" r="25" fill="url(#grad)"/>
+  <ellipse cx="42" cy="36" rx="4" ry="5" fill="white"/>
+  <ellipse cx="58" cy="36" rx="4" ry="5" fill="white"/>
+  <circle cx="42" cy="37" r="2" fill="#1f2937"/>
+  <circle cx="58" cy="37" r="2" fill="#1f2937"/>
+  <path d="M20 55 Q15 70 25 85" stroke="url(#grad)" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M30 58 Q22 72 30 88" stroke="url(#grad)" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M42 60 Q38 75 42 90" stroke="url(#grad)" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M58 60 Q62 75 58 90" stroke="url(#grad)" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M70 58 Q78 72 70 88" stroke="url(#grad)" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M80 55 Q85 70 75 85" stroke="url(#grad)" stroke-width="6" fill="none" stroke-linecap="round"/>
+</svg>

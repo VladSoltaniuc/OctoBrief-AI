@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./src/OctoBrief.Api
+      dockerfile: Dockerfile
+    ports:
+      - "5001:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/octobrief.db
+      - OpenAI__ApiKey=${OPENAI_API_KEY}
+      - Email__SmtpHost=${SMTP_HOST:-smtp.gmail.com}
+      - Email__SmtpPort=${SMTP_PORT:-587}
+      - Email__SenderEmail=${SENDER_EMAIL}
+      - Email__SenderPassword=${SENDER_PASSWORD}
+      - Email__SenderName=OctoBrief
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./src/OctoBrief.Client
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
