@@ -6,7 +6,6 @@ namespace OctoBrief.Api.Services;
 
 public class ScraperService : IScraperService
 {
-  private readonly ILogger<ScraperService> _logger;
   private readonly HttpClient _httpClient;
   private readonly HashSet<string> _allowedDomains;
 
@@ -68,22 +67,16 @@ public class ScraperService : IScraperService
     new Regex(@"^mailto:", RegexOptions.IgnoreCase | RegexOptions.Compiled),
   };
 
-  public ScraperService(ILogger<ScraperService> logger, IHttpClientFactory httpClientFactory)
+  public ScraperService(IHttpClientFactory httpClientFactory)
   {
-    _logger = logger;
     _httpClient = httpClientFactory.CreateClient("Scraper");
-
-    // Use shared domains provider
     _allowedDomains = AllowedDomainsProvider.GetAllowedDomains();
-    _logger.LogInformation("Initialized scraper with {Count} allowed domains", _allowedDomains.Count);
   }
 
   public async Task<ScrapeResult> ScrapeWebsiteAsync(string url)
   {
     try
     {
-      _logger.LogInformation("Scraping website: {Url}", url);
-
       var response = await _httpClient.GetAsync(url);
       response.EnsureSuccessStatusCode();
 
@@ -100,16 +93,11 @@ public class ScraperService : IScraperService
 
       var headlines = ExtractArticleHeadlines(doc, baseUri, homepageUrl);
       var content = ExtractContent(doc);
-
-      _logger.LogInformation("Scraped {Url}: Found {HeadlineCount} article headlines, {ContentLength} chars",
-        url, headlines.Count, content.Length);
-
       return new ScrapeResult(true, title, headlines, content);
     }
     catch (Exception ex)
     {
-      _logger.LogError(ex, "Failed to scrape {Url}", url);
-      return new ScrapeResult(false, null, [], string.Empty, ex.Message);
+      return new ScrapeResult(false, null, [], string.Empty, "500");
     }
   }
 
@@ -153,7 +141,6 @@ public class ScraperService : IScraperService
 
         // Score this URL - higher score = more likely to be an article
         var score = ScoreArticleUrl(articleUrl, baseUri);
-        _logger.LogDebug("URL: {Url} scored {Score}", articleUrl, score);
         if (score < 1) continue; // Minimum score threshold - lower to allow simpler URL structures
 
         var headlineText = ExtractHeadlineText(node);
@@ -170,8 +157,6 @@ public class ScraperService : IScraperService
     // Broader search if we found too few
     if (headlines.Count < 3)
     {
-      _logger.LogInformation("Few headlines found ({Count}), trying broader search for {Host}", headlines.Count, baseUri.Host);
-
       var allLinks = doc.DocumentNode.SelectNodes("//a[@href]");
       if (allLinks != null)
       {
@@ -198,29 +183,11 @@ public class ScraperService : IScraperService
         }
       }
     }
-
     // Fallback to homepage
-    if (headlines.Count == 0)
-    {
-      _logger.LogWarning("No article headlines found for {Host}, using homepage fallback", baseUri.Host);
-      headlines.Add(new HeadlineWithUrl($"Latest news from {baseUri.Host}", homepageUrl));
-    }
-
+    if (headlines.Count == 0) headlines.Add(new HeadlineWithUrl($"Latest news from {baseUri.Host}", homepageUrl));
     return headlines;
   }
 
-  /// <summary>
-  /// Scores a URL to determine how likely it is to be an actual article page.
-  /// Higher score = more likely to be a real article with content.
-  /// 
-  /// Examples from health.com:
-  /// - https://www.health.com/ (homepage) → score 0
-  /// - https://www.health.com/condition/allergy (category) → score 1-2
-  /// - https://www.health.com/diseases-conditions (category listing) → score 0-1
-  /// - https://www.health.com/eat-well-6951509 (article with ID) → score 5+
-  /// - https://www.health.com/diets/best-diets-for-2022 (article with year) → score 4+
-  /// - https://www.health.com/condition/allergy/allergy-shots (deep article) → score 4+
-  /// </summary>
   private int ScoreArticleUrl(string url, Uri baseUri)
   {
     try
@@ -228,16 +195,12 @@ public class ScraperService : IScraperService
       var uri = new Uri(url);
       var path = uri.AbsolutePath;
 
-      // Immediate rejection patterns
       foreach (var pattern in RejectPatterns)
       {
-        if (pattern.IsMatch(path) || pattern.IsMatch(url))
-          return 0;
+        if (pattern.IsMatch(path) || pattern.IsMatch(url)) return 0;
       }
 
       int score = 0;
-
-      // Strong article indicators (immediate high score)
       foreach (var pattern in ArticlePatterns)
       {
         if (pattern.IsMatch(path))
@@ -247,86 +210,45 @@ public class ScraperService : IScraperService
         }
       }
 
-      // Analyze path segments
       var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+      if (segments.Length == 0) return 0; // Homepage
 
-      if (segments.Length == 0)
-        return 0; // Homepage
-
-      // Analyze last segment for word count
       var lastSegment = segments[^1];
       var lastSegmentWords = lastSegment.Split(new[] { '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
 
       // Depth bonus: more segments usually means more specific content
       // /condition/allergy = 2 segments (likely category)
       // /condition/allergy/allergy-shots = 3 segments (likely article)
-      if (segments.Length >= 3)
-        score += 2;
-      else if (segments.Length == 2)
-        score += 1;
+      if (segments.Length >= 3) score += 2;
+      else if (segments.Length == 2) score += 1;
       else if (segments.Length == 1)
       {
-        // Single segment - give bonus for file extensions or IDs that indicate content
         var segment = segments[0];
         if (segment.EndsWith(".php", StringComparison.OrdinalIgnoreCase) ||
             segment.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
             segment.EndsWith(".htm", StringComparison.OrdinalIgnoreCase))
-          score += 2; // PHP/HTML files could be articles
-        // Check for IDs at the end (like 0P54516, -123456, etc.)
-        else if (System.Text.RegularExpressions.Regex.IsMatch(segment, @"[-_]?[0-9A-Z]{5,}$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-          score += 3; // Has ID at the end
-        else if (lastSegmentWords.Length >= 4)
-          score += 2; // Long hyphenated slug likely an article
+          score += 2;
+        else if (Regex.IsMatch(segment, @"[-_]?[0-9A-Z]{5,}$", RegexOptions.IgnoreCase)) score += 3;
+        else if (lastSegmentWords.Length >= 4) score += 2;
       }
 
-      // Check if last segment is a category word (bad sign)
-      if (CategoryWords.Contains(lastSegment))
-      {
-        score -= 2;
-      }
-      // Check if last segment is hyphenated with multiple words (good sign - article slug)
-      else if (lastSegmentWords.Length >= 3)
-      {
-        score += 3; // e.g., "best-diets-for-2022" or "allergy-shots-treatment-guide"
-      }
-      else if (lastSegmentWords.Length == 2)
-      {
-        score += 1; // e.g., "allergy-shots"
-      }
-      else if (lastSegmentWords.Length == 1 && !CategoryWords.Contains(lastSegmentWords[0]))
-      {
-        // Single word that's not a category - could be an article or category
-        // Check if it looks like a slug (has numbers or is very specific)
-        if (Regex.IsMatch(lastSegment, @"\d"))
-          score += 2; // Has numbers, likely article ID
-      }
+      if (CategoryWords.Contains(lastSegment)) score -= 2;
+      else if (lastSegmentWords.Length >= 3) score += 3;
+      else if (lastSegmentWords.Length == 2) score += 1;
+      else if (lastSegmentWords.Length == 1 && !CategoryWords.Contains(lastSegmentWords[0]) && Regex.IsMatch(lastSegment, @"\d")) score += 2;
 
-      // Check for year in URL (articles often have years)
-      if (Regex.IsMatch(path, @"20\d{2}"))
-        score += 2;
-
-      // Check for numeric ID anywhere in URL
-      if (Regex.IsMatch(lastSegment, @"\d{5,}"))
-        score += 3;
+      if (Regex.IsMatch(path, @"20\d{2}")) score += 2;
+      if (Regex.IsMatch(lastSegment, @"\d{5,}")) score += 3;
 
       // Penalize if path looks like a category listing
       // e.g., /diseases-conditions, /health-news, /fitness-tips
-      if (segments.Length == 1)
-      {
-        // Single segment paths are almost always categories unless they have an ID
-        if (!Regex.IsMatch(lastSegment, @"\d{5,}"))
-          score -= 1;
-      }
+      if (segments.Length == 1) if (!Regex.IsMatch(lastSegment, @"\d{5,}")) score -= 1;
 
       // Check for common article URL patterns
-      if (path.Contains("/article/") || path.Contains("/story/") ||
-          path.Contains("/news/") || path.Contains("/post/"))
-        score += 2;
+      if (path.Contains("/article/") || path.Contains("/story/") || path.Contains("/news/") || path.Contains("/post/")) score += 2;
 
       // Bonus for very long slugs (articles tend to have descriptive URLs)
-      if (lastSegment.Length > 30)
-        score += 1;
-
+      if (lastSegment.Length > 30) score += 1;
       return score;
     }
     catch
@@ -342,8 +264,7 @@ public class ScraperService : IScraperService
     if (headlineNode != null)
     {
       var text = CleanText(headlineNode.InnerText);
-      if (!string.IsNullOrWhiteSpace(text) && text.Length >= 10)
-        return text;
+      if (!string.IsNullOrWhiteSpace(text) && text.Length >= 10) return text;
     }
 
     // Try elements with headline-like classes
@@ -351,10 +272,8 @@ public class ScraperService : IScraperService
     if (titleNode != null)
     {
       var text = CleanText(titleNode.InnerText);
-      if (!string.IsNullOrWhiteSpace(text) && text.Length >= 10)
-        return text;
+      if (!string.IsNullOrWhiteSpace(text) && text.Length >= 10) return text;
     }
-
     return CleanText(linkNode.InnerText);
   }
 
@@ -414,44 +333,34 @@ public class ScraperService : IScraperService
 
   private string ResolveUrl(string href, Uri baseUri)
   {
-    try
+    if (href.StartsWith("//"))
     {
-      if (href.StartsWith("//"))
-      {
-        var url = $"{baseUri.Scheme}:{href}";
-        return IsAllowedDomain(url) ? url : string.Empty;
-      }
-
-      if (Uri.TryCreate(href, UriKind.Absolute, out var absoluteUri))
-      {
-        if (absoluteUri.Scheme == "http" || absoluteUri.Scheme == "https")
-        {
-          var url = absoluteUri.ToString();
-          return IsAllowedDomain(url) ? url : string.Empty;
-        }
-        return string.Empty;
-      }
-
-      if (Uri.TryCreate(baseUri, href, out var resolvedUri))
-      {
-        var url = resolvedUri.ToString();
-        return IsAllowedDomain(url) ? url : string.Empty;
-      }
+      var url = $"{baseUri.Scheme}:{href}";
+      return IsAllowedDomain(url) ? url : string.Empty;
     }
-    catch { }
 
+    if (Uri.TryCreate(href, UriKind.Absolute, out var absoluteUri))
+    {
+      if (absoluteUri.Scheme == "http" || absoluteUri.Scheme == "https")
+      {
+        var url = absoluteUri.ToString();
+        return IsAllowedDomain(url) ? url : string.Empty;
+      }
+      return string.Empty;
+    }
+
+    if (Uri.TryCreate(baseUri, href, out var resolvedUri))
+    {
+      var url = resolvedUri.ToString();
+      return IsAllowedDomain(url) ? url : string.Empty;
+    }
     return string.Empty;
   }
 
   private string ExtractContent(HtmlDocument doc)
   {
     var nodesToRemove = doc.DocumentNode.SelectNodes("//script|//style|//nav|//header|//footer|//aside|//noscript|//iframe|//form");
-    if (nodesToRemove != null)
-    {
-      foreach (var node in nodesToRemove.ToList())
-        node.Remove();
-    }
-
+    if (nodesToRemove != null) foreach (var node in nodesToRemove.ToList()) node.Remove();
     var sb = new StringBuilder();
     var mainContent = doc.DocumentNode.SelectSingleNode("//main")
                      ?? doc.DocumentNode.SelectSingleNode("//article")
@@ -459,23 +368,18 @@ public class ScraperService : IScraperService
                      ?? doc.DocumentNode.SelectSingleNode("//*[contains(@class, 'content')]")
                      ?? doc.DocumentNode.SelectSingleNode("//body");
 
-    if (mainContent != null)
+    if (mainContent == null) return sb.ToString().Trim();
+    var paragraphs = mainContent.SelectNodes(".//p");
+    if (paragraphs == null) return sb.ToString().Trim();
+    foreach (var p in paragraphs)
     {
-      var paragraphs = mainContent.SelectNodes(".//p");
-      if (paragraphs != null)
+      var text = CleanText(p.InnerText);
+      if (!string.IsNullOrWhiteSpace(text) && text.Length > 30)
       {
-        foreach (var p in paragraphs)
-        {
-          var text = CleanText(p.InnerText);
-          if (!string.IsNullOrWhiteSpace(text) && text.Length > 30)
-          {
-            sb.AppendLine(text);
-            sb.AppendLine();
-          }
-        }
+        sb.AppendLine(text);
+        sb.AppendLine();
       }
     }
-
     return sb.ToString().Trim();
   }
 

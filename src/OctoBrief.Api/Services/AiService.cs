@@ -8,17 +8,12 @@ namespace OctoBrief.Api.Services;
 public class AiService : IAiService
 {
   private readonly IConfiguration _configuration;
-  private readonly ILogger<AiService> _logger;
   private readonly HashSet<string> _allowedDomains;
 
   public AiService(IConfiguration configuration, ILogger<AiService> logger)
   {
     _configuration = configuration;
-    _logger = logger;
-
-    // Use shared domains provider
     _allowedDomains = AllowedDomainsProvider.GetAllowedDomains();
-    _logger.LogInformation("Initialized AI service with {Count} allowed domains", _allowedDomains.Count);
   }
 
   public async Task<AiSummaryResult> SummarizeContentAsync(string websiteName, List<string> headlines, string content, List<string>? sourceUrls = null, string? topic = null)
@@ -26,15 +21,11 @@ public class AiService : IAiService
     var apiKey = _configuration["OpenAI:ApiKey"];
 
     if (string.IsNullOrEmpty(apiKey) || apiKey == "YOUR_OPENAI_API_KEY")
-    {
-      _logger.LogWarning("OpenAI API key not configured, using fallback summarization");
       return GenerateFallbackSummary(websiteName, headlines, content, sourceUrls);
-    }
 
     try
     {
       var client = new ChatClient("gpt-4o-mini", apiKey);
-
       var headlinesList = string.Join("\n", headlines.Take(20).Select((h, i) => $"{i + 1}. {h}"));
       var truncatedContent = content.Length > 8000 ? content[..8000] + "..." : content;
       var sourceUrlsInfo = sourceUrls != null && sourceUrls.Count > 0
@@ -80,20 +71,14 @@ public class AiService : IAiService
 
       var response = await client.CompleteChatAsync(prompt);
       var htmlContent = response.Value.Content[0].Text;
-
-      // Generate subject line
       var subjectTopicPart = !string.IsNullOrWhiteSpace(topic) ? $" on {topic}" : "";
       var subjectPrompt = $"Generate a short, catchy email subject line (max 60 chars) for a news digest{subjectTopicPart} from {websiteName}. Just the subject, no quotes.";
       var subjectResponse = await client.CompleteChatAsync(subjectPrompt);
       var subject = subjectResponse.Value.Content[0].Text.Trim().Trim('"');
-
-      _logger.LogInformation("AI summarization completed for {Website} with topic filter: {Topic}", websiteName, topic ?? "none");
-
       return new AiSummaryResult(true, subject, WrapInEmailTemplate(websiteName, htmlContent));
     }
     catch (Exception ex)
     {
-      _logger.LogError(ex, "AI summarization failed, using fallback");
       return GenerateFallbackSummary(websiteName, headlines, content, sourceUrls);
     }
   }
@@ -103,16 +88,11 @@ public class AiService : IAiService
     var apiKey = _configuration["OpenAI:ApiKey"];
 
     if (string.IsNullOrEmpty(apiKey) || apiKey == "YOUR_OPENAI_API_KEY")
-    {
-      _logger.LogWarning("OpenAI API key not configured, using fallback summarization");
       return GenerateMultiSourceFallbackSummary(topic, country, websiteData);
-    }
 
     try
     {
       var client = new ChatClient("gpt-4o-mini", apiKey);
-
-      // Build the source data for the prompt with pre-filtered headlines
       var sourcesInfo = new StringBuilder();
       foreach (var source in websiteData)
       {
@@ -120,8 +100,6 @@ public class AiService : IAiService
         sourcesInfo.AppendLine($"\n=== {source.Name} ({outletType}) ===");
         sourcesInfo.AppendLine($"Site URL: {source.Url}");
         sourcesInfo.AppendLine("Headlines with article URLs:");
-
-        // Pre-filter headlines to remove obvious garbage before sending to AI
         var filteredHeadlines = source.Headlines
           .Where(h => IsValidHeadline(h.Title) && IsValidArticleUrl(h.Url))
           .Take(10);
@@ -136,11 +114,9 @@ public class AiService : IAiService
           sourcesInfo.AppendLine($"Content Preview: {preview}");
         }
       }
-
       var countryDisplay = country.Equals("global", StringComparison.OrdinalIgnoreCase) ? "Global" : country;
       var majorCount = websiteData.Count(w => w.IsMajorOutlet);
       var smallerCount = websiteData.Count(w => !w.IsMajorOutlet);
-
       var prompt = $"""
         You are a strict news curator. Create a brief about "{topic}" for {countryDisplay}.
 
@@ -181,15 +157,10 @@ public class AiService : IAiService
       var subjectPrompt = $"Generate a short, catchy email subject line (max 60 chars) for a {countryDisplay} news digest about {topic}. Just the subject, no quotes.";
       var subjectResponse = await client.CompleteChatAsync(subjectPrompt);
       var subject = subjectResponse.Value.Content[0].Text.Trim().Trim('"');
-
-      _logger.LogInformation("Multi-source AI summarization completed for topic: {Topic}, country: {Country}, sources: {SourceCount}",
-        topic, country, websiteData.Count);
-
       return new AiSummaryResult(true, subject, WrapInMultiSourceEmailTemplate(topic, countryDisplay, htmlContent));
     }
     catch (Exception ex)
     {
-      _logger.LogError(ex, "Multi-source AI summarization failed, using fallback");
       return GenerateMultiSourceFallbackSummary(topic, country, websiteData);
     }
   }
@@ -198,36 +169,15 @@ public class AiService : IAiService
   {
     var sb = new StringBuilder();
     var countryDisplay = country.Equals("global", StringComparison.OrdinalIgnoreCase) ? "Global" : country;
-
-    _logger.LogInformation("Generating fallback summary for {Topic} - {Country} with {SourceCount} sources",
-      topic, countryDisplay, websiteData.Count);
-
     int validHeadlineCount = 0;
     foreach (var source in websiteData)
     {
-      // Log ALL headlines for debugging
-      foreach (var headline in source.Headlines)
-      {
-        var headlineValid = IsValidHeadline(headline.Title);
-        var urlValid = IsValidArticleUrl(headline.Url);
-        _logger.LogInformation("Headline from {Source}: '{Title}' -> {Url} | HeadlineValid={HValid}, UrlValid={UValid}",
-          source.Name, headline.Title, headline.Url, headlineValid, urlValid);
-      }
-
       var validHeadlines = source.Headlines.Where(h => IsValidHeadline(h.Title) && IsValidArticleUrl(h.Url)).Take(2).ToList();
-      _logger.LogInformation("Source {Name}: {Total} headlines, {Valid} valid after filtering",
-        source.Name, source.Headlines.Count, validHeadlines.Count);
-
       foreach (var headline in validHeadlines)
       {
-        // Extract domain from article URL for display
         var displayUrl = headline.Url;
-        try
-        {
-          var uri = new Uri(headline.Url);
-          displayUrl = uri.Host;
-        }
-        catch { }
+        var uri = new Uri(headline.Url);
+        displayUrl = uri.Host;
 
         sb.AppendLine("<div class=\"story\">");
         sb.AppendLine($"<h4>{headline.Title}</h4>");
@@ -237,10 +187,8 @@ public class AiService : IAiService
       }
     }
 
-    // If no valid headlines found after filtering, use the base site URLs as fallback
     if (validHeadlineCount == 0)
     {
-      _logger.LogWarning("No valid headlines after filtering, using base URLs as fallback");
       foreach (var source in websiteData.Take(3))
       {
         sb.AppendLine("<div class=\"story\">");
@@ -249,7 +197,6 @@ public class AiService : IAiService
         sb.AppendLine("</div>");
       }
     }
-
     var subject = $"{topic} News Brief - {countryDisplay} - {DateTime.UtcNow:MMM dd}";
     return new AiSummaryResult(true, subject, sb.ToString());
   }
@@ -263,7 +210,7 @@ public class AiService : IAiService
     sb.AppendLine("<p>Here are the latest headlines we found:</p>");
     sb.AppendLine("<h3>Top Headlines</h3>");
 
-    foreach (var headline in headlines.Take(3)) // Limit to 3 headlines
+    foreach (var headline in headlines.Take(3))
     {
       sb.AppendLine("<div class=\"story\">");
       sb.AppendLine($"<h4><strong>{headline}</strong></h4>");
@@ -277,7 +224,6 @@ public class AiService : IAiService
       sb.AppendLine("<h3>Content Preview</h3>");
       sb.AppendLine($"<p>{preview}</p>");
     }
-
     var subject = $"Your {websiteName} News Brief - {DateTime.UtcNow:MMM dd}";
     return new AiSummaryResult(true, subject, WrapInEmailTemplate(websiteName, sb.ToString()));
   }
@@ -522,80 +468,42 @@ public class AiService : IAiService
 </html>";
   }
 
-  /// <summary>
-  /// Pre-filters headlines to remove obvious garbage before sending to AI
-  /// </summary>
   private static bool IsValidHeadline(string headline)
   {
     if (string.IsNullOrWhiteSpace(headline)) return false;
-
-    // Too short to be a real headline
     if (headline.Length < 20) return false;
-
-    // Too few words
     var wordCount = headline.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
     if (wordCount < 4) return false;
-
-    // Blocklist of common garbage patterns
     var garbage = new[]
     {
-      // Navigation and UI elements
       "more top stories", "top stories", "most watched", "watch today", "have a news tip",
       "have a tip", "breaking news", "latest news", "more stories", "read more",
       "sign up", "sign in", "log in", "subscribe", "newsletter",
-      
-      // Category labels (not news)
       "health & wellness", "sports coverage", "video game reviews", "popular reviews",
       "the athletic", "entertainment", "opinion", "photos", "gallery", "videos",
-      
-      // Promotional content
       "season 2 of", "available now", "watch now", "listen now", "download",
       "exclusively on", "coming soon",
-      
-      // Navigation patterns
       "guides hub", "release dates", "in review", "year in review",
-      
-      // Meta content
       "technology review explains", "mit technology review explains",
       "exploring ahead", "bidding farewell"
     };
-
     var lower = headline.ToLowerInvariant();
     if (garbage.Any(g => lower.Contains(g))) return false;
-
-    // Starts with time/date indicator
     if (System.Text.RegularExpressions.Regex.IsMatch(headline, @"^\d{1,2}:\d{2}")) return false;
     if (System.Text.RegularExpressions.Regex.IsMatch(headline, @"^20\d{2}\s")) return false;
-
     return true;
   }
 
-  /// <summary>
-  /// Validates that a URL points to an actual article, not a search/category page
-  /// </summary>
   private bool IsValidArticleUrl(string url)
   {
     if (string.IsNullOrWhiteSpace(url)) return false;
-
-    // Must have valid URL format
     if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
-
-    // Must be http/https
     if (uri.Scheme != "http" && uri.Scheme != "https") return false;
-
-    // Must be from an allowed domain (strip www. for comparison)
     var host = uri.Host;
-    if (host.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
-      host = host.Substring(4);
-    if (!_allowedDomains.Contains(host))
-    {
-      _logger.LogWarning("Blocked URL from unauthorized domain: {Url}", url);
-      return false;
-    }
+    if (host.StartsWith("www.", StringComparison.OrdinalIgnoreCase)) host = host.Substring(4);
+    if (!_allowedDomains.Contains(host)) return false;
 
     var path = uri.AbsolutePath.ToLowerInvariant();
-
-    // Reject non-article patterns
     var rejectPatterns = new[]
     {
       "/tag/", "/tags/", "/category/", "/categories/", "/author/",
@@ -603,12 +511,8 @@ public class AiService : IAiService
       "/feed", "/rss", "/login", "/register", "/subscribe",
       "/newsletter", "/about", "/contact", "/privacy", "/terms"
     };
-
     if (rejectPatterns.Any(p => path.Contains(p))) return false;
-
-    // Reject if just the homepage
     if (string.IsNullOrEmpty(path) || path == "/") return false;
-
     return true;
   }
 }

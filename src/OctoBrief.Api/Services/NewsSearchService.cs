@@ -1,13 +1,7 @@
-using System.Text.Json;
-
 namespace OctoBrief.Api.Services;
 
 public class NewsSearchService : INewsSearchService
 {
-  private readonly ILogger<NewsSearchService> _logger;
-
-  // News sources organized by Country -> Category
-  // Structure: Country > Category > List of sources
   private static readonly Dictionary<string, Dictionary<string, List<NewsSource>>> CountryNewsSources = new()
   {
     ["usa"] = new()
@@ -444,9 +438,8 @@ public class NewsSearchService : INewsSearchService
     },
   };
 
-  public NewsSearchService(ILogger<NewsSearchService> logger)
+  public NewsSearchService()
   {
-    _logger = logger;
   }
 
   public async Task<NewsSearchResult> SearchNewsSourcesAsync(string topic, string country)
@@ -456,62 +449,12 @@ public class NewsSearchService : INewsSearchService
       var sources = new List<NewsSource>();
       var countryKey = country.ToLowerInvariant().Trim();
       var topicKey = topic.ToLowerInvariant().Trim();
-
-      _logger.LogInformation("Searching news sources for topic: {Topic}, country: {Country}", topic, country);
-
-      // Global uses only English-speaking countries: USA, UK, Canada
       var globalCountries = new[] { "usa", "uk", "canada" };
 
-      // Handle "all" topic - get all topics from the specified country
-      if (topicKey == "all")
-      {
-        if (countryKey == "global")
-        {
-          // All topics + Global = get sources from USA, UK, Canada only
-          foreach (var globalCountry in globalCountries)
-          {
-            if (CountryNewsSources.TryGetValue(globalCountry, out var countryData))
-            {
-              foreach (var topicSources in countryData.Values)
-              {
-                sources.AddRange(topicSources);
-              }
-            }
-          }
-        }
-        else if (CountryNewsSources.TryGetValue(countryKey, out var countryTopics))
-        {
-          // All topics for a specific country
-          foreach (var topicSources in countryTopics.Values)
-          {
-            sources.AddRange(topicSources);
-          }
-        }
-      }
-      // Handle "global" country - get specific topic from USA, UK, Canada
-      else if (countryKey == "global")
-      {
-        foreach (var globalCountry in globalCountries)
-        {
-          if (CountryNewsSources.TryGetValue(globalCountry, out var countryData))
-          {
-            if (countryData.TryGetValue(topicKey, out var topicSources))
-            {
-              sources.AddRange(topicSources);
-            }
-          }
-        }
-      }
       // Specific country + specific topic
-      else if (CountryNewsSources.TryGetValue(countryKey, out var countryTopics))
-      {
-        if (countryTopics.TryGetValue(topicKey, out var topicSources))
-        {
-          sources.AddRange(topicSources);
-        }
-      }
-
-      // Remove duplicates and shuffle
+      if (CountryNewsSources.TryGetValue(countryKey, out var countryTopics)
+      && countryTopics.TryGetValue(topicKey, out var topicSources))
+        sources.AddRange(topicSources);
       sources = sources
         .GroupBy(s => s.Url)
         .Select(g => g.First())
@@ -519,26 +462,18 @@ public class NewsSearchService : INewsSearchService
         .Take(5)
         .ToList();
 
-      // Fallback if no sources found
       if (sources.Count == 0)
       {
-        _logger.LogWarning("No sources found for topic: {Topic}, country: {Country}. Using USA technology as fallback.", topic, country);
         sources = CountryNewsSources["usa"]["technology"]
           .OrderBy(_ => Random.Shared.Next())
           .Take(5)
           .ToList();
       }
-
-      _logger.LogInformation("Found {Count} news sources: {Sources}",
-          sources.Count,
-          string.Join(", ", sources.Select(s => s.Name)));
-
       return await Task.FromResult(new NewsSearchResult(true, sources));
     }
     catch (Exception ex)
     {
-      _logger.LogError(ex, "Failed to search for news sources");
-      return new NewsSearchResult(false, [], ex.Message);
+      return new NewsSearchResult(false, [], "500");
     }
   }
 }

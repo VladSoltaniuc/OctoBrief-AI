@@ -1,9 +1,5 @@
 namespace OctoBrief.Api.Services;
 
-/// <summary>
-/// Provides domain validation utilities for news source URLs.
-/// Centralized domain list eliminates duplication between services.
-/// </summary>
 public static class AllowedDomainsProvider
 {
   private static readonly HashSet<string> AllowedDomains = new(StringComparer.OrdinalIgnoreCase)
@@ -110,41 +106,24 @@ public static class AllowedDomainsProvider
     "cointelegraph.com"
   };
 
-  /// <summary>
-  /// Gets a copy of the allowed domains set for initialization.
-  /// </summary>
   public static HashSet<string> GetAllowedDomains()
   {
     return new HashSet<string>(AllowedDomains, StringComparer.OrdinalIgnoreCase);
   }
 
-  /// <summary>
-  /// Checks if a domain is in the allowed list.
-  /// Handles www prefix normalization.
-  /// </summary>
-  /// <param name="domain">The domain to check (can include www prefix)</param>
-  /// <returns>True if the domain is allowed</returns>
   public static bool IsAllowedDomain(string domain)
   {
     var normalizedDomain = NormalizeDomain(domain);
     return AllowedDomains.Contains(normalizedDomain);
   }
 
-  /// <summary>
-  /// Normalizes a domain by removing the www prefix.
-  /// </summary>
   public static string NormalizeDomain(string domain)
   {
-    if (string.IsNullOrWhiteSpace(domain))
-      return string.Empty;
-
+    if (string.IsNullOrWhiteSpace(domain)) return string.Empty;
     return domain.StartsWith("www.", StringComparison.OrdinalIgnoreCase)
       ? domain[4..]
       : domain;
   }
 
-  /// <summary>
-  /// Gets the count of allowed domains.
-  /// </summary>
   public static int Count => AllowedDomains.Count;
 }

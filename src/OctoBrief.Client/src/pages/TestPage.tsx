@@ -29,12 +29,8 @@ export function TestPage() {
   }, [])
 
   const loadConfig = async () => {
-    try {
-      const config = await api.getConfigStatus()
-      setConfigStatus(config)
-    } catch (err) {
-      console.error('Failed to load config:', err)
-    }
+    const config = await api.getConfigStatus()
+    setConfigStatus(config)
   }
 
   const runScrapeTest = async () => {
