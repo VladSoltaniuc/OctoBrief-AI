@@ -12,16 +12,15 @@
    
    ```json
    {
+      "Email": {
+        "SmtpHost": "smtp.mail.yahoo.com", <-- You can use another provider if you want to, yahoo is the easiest to set up, go to login.yahoo.com/myaccount/security and enable your 2FA
+        "SmtpPort": 587,
+        "SenderEmail": "REPLACE_HERE",
+        "SenderPassword": "REPLACE_HERE",
+        "SenderName": "OctoBrief"
+      },
      "OpenAI": {
-       "ApiKey": "sk-your-openai-api-key-here"
-     },
-     "Smtp": {
-       "Host": "smtp.gmail.com",
-       "Port": 587,
-       "Username": "your-email@gmail.com",
-       "Password": "your-app-password-here",
-       "FromEmail": "your-email@gmail.com",
-       "FromName": "OctoBrief"
+       "ApiKey": "REPLACE_HERE"
      }
    }
    ```
@@ -30,7 +29,6 @@
    - For Gmail: Use an [App Password](https://support.google.com/accounts/answer/185833) instead of your regular password
    - For Yahoo: Use `smtp.mail.yahoo.com` with port `587`
    - For Outlook/Hotmail: Use `smtp-mail.outlook.com` with port `587`
-   - Make sure to enable "Less secure app access" or use app-specific passwords
 
 3. **Install Frontend Dependencies**
    ```bash
@@ -59,15 +57,3 @@
    - Select a topic and country
    - Click "Generate Preview" to see the brief
    - Enter your email and click "Send to Email" to receive it
-
-### Configuration Details
-
-**OpenAI API Key:**
-- Sign up at [platform.openai.com](https://platform.openai.com)
-- Go to API Keys section and create a new key
-- Copy the key (starts with `sk-`) to `appsettings.json`
-
-**SMTP Configuration:**
-- The app uses SMTP to send emails with news briefs
-- Port 587 uses STARTTLS encryption (recommended)
-- Test your credentials before using in production
