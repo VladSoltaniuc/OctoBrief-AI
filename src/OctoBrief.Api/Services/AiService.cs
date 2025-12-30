@@ -41,8 +41,8 @@ public class AiService : IAiService
         displayUrl = uri.Host;
 
         sb.AppendLine("<div class=\"story\">");
-        sb.AppendLine($"<h4>{SetStrLimit(headline.Title, 100)}</h4>");
-        sb.AppendLine($"<div class=\"description\">{await GenerateDescriptionAsync(headline.Title)}</div>");
+        sb.AppendLine($"<h4>{SetStrLimit(headline.Title, 85)}</h4>");
+        sb.AppendLine($"<div class=\"description\">{await GenerateDescriptionAsync(headline.Title, 40)}</div>");
         sb.AppendLine($"<a href=\"{headline.Url}\" target=\"_blank\" class=\"story-link\">{displayUrl}</a>");
         sb.AppendLine("</div>");
         validHeadlineCount++;
@@ -111,9 +111,9 @@ public class AiService : IAiService
     return true;
   }
 
-  public async Task<string> GenerateDescriptionAsync(string title)
+  public async Task<string> GenerateDescriptionAsync(string title = "Generic News Article", int length = 30)
   {
-    var prompt = $"Write a short, non-repetitive, engaging description for the title at hand '{title}'. Do not repeat the title. Focus on what kind of news or content a reader can expect from this site. The text you generate needs to contain a maximum of 30 characters";
+    var prompt = $"Write a short, non-repetitive, engaging description for the title at hand '{title}'. Do not repeat the title. Focus on what kind of news or content a reader can expect from this site. The text you generate needs to contain a maximum of {length} characters";
     var apiKey = _configuration["OpenAI:ApiKey"];
     if (string.IsNullOrEmpty(apiKey)) return $"A source for the latest updates.";
     try

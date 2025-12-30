@@ -103,9 +103,9 @@
 }
 
 .description {
-  font-size: 0.75rem !important;
-  color: #6b7280 !important;
-  margin-top: 0.25rem !important;
-  margin-bottom: 0.25rem !important;
-  line-height: 1.4 !important;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
 }
