@@ -1,8 +1,9 @@
+using OctoBrief.Api.Models;
+
 namespace OctoBrief.Api.Services;
 
 public interface IEmailService
 {
-    Task<EmailResult> SendEmailAsync(string to, string subject, string content);
+  Task<EmailDto> SendEmailAsync(string to, string subject, string content);
+  EmailDto FakeSendEmail(string to);
 }
-
-public record EmailResult(bool Success, string Message, string? Error = null);

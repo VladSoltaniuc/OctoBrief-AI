@@ -131,13 +131,13 @@ export const api = {
     const response = await fetch(`${API_BASE}/brief/preview`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, country }),
+      body: JSON.stringify({ topic: topic.toLowerCase(), country: country.toLowerCase() }),
     })
     return response.json()
   },
 
   async sendBriefToEmail(email: string, subject: string, htmlContent: string): Promise<SendEmailResponse> {
-    const response = await fetch(`${API_BASE}/brief/send-email`, {
+    const response = await fetch(`${API_BASE}/email/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, subject, htmlContent }),

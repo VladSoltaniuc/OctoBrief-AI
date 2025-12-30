@@ -1,6 +1,5 @@
-using OpenAI;
-using OpenAI.Chat;
 using OctoBrief.Api.Models;
+using OpenAI.Chat;
 using System.Text;
 
 namespace OctoBrief.Api.Services;
@@ -8,30 +7,16 @@ namespace OctoBrief.Api.Services;
 public class AiService : IAiService
 {
   private readonly IConfiguration _configuration;
-  private readonly HashSet<string> _allowedDomains;
 
-  public AiService(IConfiguration configuration, ILogger<AiService> logger)
+  public AiService(IConfiguration configuration)
   {
     _configuration = configuration;
-    _allowedDomains = AllowedDomainsProvider.GetAllowedDomains();
   }
 
-  public async Task<AiSummaryResult> SummarizeMultiSourceNewsAsync(string topic, string country, List<WebsiteNewsData> websiteData)
+  public async Task<string> GenerateCards(List<WebsiteData> sources)
   {
-    var apiKey = _configuration["OpenAI:ApiKey"];
-    //TODO: Improve
-    if (string.IsNullOrEmpty(apiKey) || apiKey == "YOUR_OPENAI_API_KEY")
-      return await GenerateMultiSourceFallbackSummary(topic, country, websiteData);
-
-    return await GenerateMultiSourceFallbackSummary(topic, country, websiteData);
-  }
-
-  private async Task<AiSummaryResult> GenerateMultiSourceFallbackSummary(string topic, string country, List<WebsiteNewsData> websiteData)
-  {
-    var sb = new StringBuilder();
-    var countryDisplay = country.Equals("global", StringComparison.OrdinalIgnoreCase) ? "Global" : country;
-    int validHeadlineCount = 0;
-    foreach (var source in websiteData)
+    var html = new StringBuilder();
+    foreach (var source in sources)
     {
       var validHeadlines = source.Headlines.Where(h => IsValidHeadline(h.Title) && IsValidArticleUrl(h.Url)).Take(2).ToList();
       foreach (var headline in validHeadlines)
@@ -39,28 +24,38 @@ public class AiService : IAiService
         var displayUrl = headline.Url;
         var uri = new Uri(headline.Url);
         displayUrl = uri.Host;
-
-        sb.AppendLine("<div class=\"story\">");
-        sb.AppendLine($"<h4>{SetStrLimit(headline.Title, 85)}</h4>");
-        sb.AppendLine($"<div class=\"description\">{await GenerateDescriptionAsync(headline.Title, 40)}</div>");
-        sb.AppendLine($"<a href=\"{headline.Url}\" target=\"_blank\" class=\"story-link\">{displayUrl}</a>");
-        sb.AppendLine("</div>");
-        validHeadlineCount++;
+        html.AppendLine("<div class=\"story\">");
+        html.AppendLine($"<h4>{SetStrLimit(headline.Title, 85)}</h4>");
+        html.AppendLine($"<div class=\"description\">{await GenerateDescriptionAsync(headline.Title, 40)}</div>");
+        html.AppendLine($"<a href=\"{headline.Url}\" target=\"_blank\" class=\"story-link\">{displayUrl}</a>");
+        html.AppendLine("</div>");
       }
     }
+    return html.ToString();
+  }
 
-    if (validHeadlineCount == 0)
+  public async Task<string> GenerateDescriptionAsync(string title = "Generic News Article", int length = 30)
+  {
+    var prompt = $"Write a short, non-repetitive, engaging description for the title at hand '{title}' that matches the language of the title. Do not repeat the title. Focus on what kind of news or content a reader can expect from this site. The text you generate needs to contain a maximum of {length} characters";
+    var apiKey = _configuration["OpenAI:ApiKey"];
+    if (string.IsNullOrEmpty(apiKey)) return $"A source for the latest updates.";
+    try
     {
-      foreach (var source in websiteData.Take(3))
-      {
-        sb.AppendLine("<div class=\"story\">");
-        sb.AppendLine($"<h4>Latest news from {source.Name}</h4>");
-        sb.AppendLine($"<a href=\"{source.Url}\" target=\"_blank\" class=\"story-link\">Visit {source.Name}</a>");
-        sb.AppendLine("</div>");
-      }
+      var client = new ChatClient("gpt-4o-mini", apiKey);
+      var response = await client.CompleteChatAsync(prompt);
+      return response.Value.Content[0].Text.Trim();
     }
-    var subject = $"{topic} News Brief - {countryDisplay} - {DateTime.UtcNow:MMM dd}";
-    return new AiSummaryResult(true, subject, sb.ToString());
+    catch
+    {
+      return $"A source for the latest updates.";
+    }
+  }
+
+  private static string SetStrLimit(string str, int limit)
+  {
+    if (string.IsNullOrEmpty(str) || limit < 0) return str;
+    if (str.Length <= limit) return str;
+    return str.Substring(0, limit) + "...";
   }
 
   private static bool IsValidHeadline(string headline)
@@ -96,7 +91,6 @@ public class AiService : IAiService
     if (uri.Scheme != "http" && uri.Scheme != "https") return false;
     var host = uri.Host;
     if (host.StartsWith("www.", StringComparison.OrdinalIgnoreCase)) host = host.Substring(4);
-    if (!_allowedDomains.Contains(host)) return false;
 
     var path = uri.AbsolutePath.ToLowerInvariant();
     var rejectPatterns = new[]
@@ -110,47 +104,4 @@ public class AiService : IAiService
     if (string.IsNullOrEmpty(path) || path == "/") return false;
     return true;
   }
-
-  public async Task<string> GenerateDescriptionAsync(string title = "Generic News Article", int length = 30)
-  {
-    var prompt = $"Write a short, non-repetitive, engaging description for the title at hand '{title}'. Do not repeat the title. Focus on what kind of news or content a reader can expect from this site. The text you generate needs to contain a maximum of {length} characters";
-    var apiKey = _configuration["OpenAI:ApiKey"];
-    if (string.IsNullOrEmpty(apiKey)) return $"A source for the latest updates.";
-    try
-    {
-      var client = new ChatClient("gpt-4o-mini", apiKey);
-      var response = await client.CompleteChatAsync(prompt);
-      return response.Value.Content[0].Text.Trim();
-    }
-    catch
-    {
-      return $"A source for the latest updates.";
-    }
-  }
-
-  public async Task<string> GenerateDescriptionForTopic(string topic)
-  {
-    var prompt = $"Write a short, engaging, and informative description about the topic '{topic}'. Do not just restate the topic. Explain what a reader can expect to learn or understand about this topic in the news.";
-    var apiKey = _configuration["OpenAI:ApiKey"];
-    if (string.IsNullOrEmpty(apiKey) || apiKey == "YOUR_OPENAI_API_KEY")
-      return $"Latest news and insights about {topic}.";
-    try
-    {
-      var client = new ChatClient("gpt-4o-mini", apiKey);
-      var response = await client.CompleteChatAsync(prompt);
-      return response.Value.Content[0].Text.Trim();
-    }
-    catch
-    {
-      return $"Latest news and insights about {topic}.";
-    }
-  }
-
-  public static string SetStrLimit(string str, int limit)
-  {
-    if (string.IsNullOrEmpty(str) || limit < 0) return str;
-    if (str.Length <= limit) return str;
-    return str.Substring(0, limit) + "...";
-  }
 }
-

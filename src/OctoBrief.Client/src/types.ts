@@ -108,7 +108,7 @@ export interface PreviewBriefResponse {
   success: boolean
   subject?: string
   htmlContent?: string
-  websiteResults?: WebsiteBriefResult[]
+  sources: number
   totalHeadlines?: number
   topic?: string
   country?: string
@@ -120,7 +120,6 @@ export interface WebsiteBriefResult {
   websiteName: string
   success: boolean
   headlinesFound: number
-  isMajorOutlet?: boolean
   error?: string
 }
 

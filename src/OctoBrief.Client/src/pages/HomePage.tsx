@@ -43,7 +43,8 @@ export function HomePage() {
     }
 
     try {
-      setLoadingStep('Searching for news sources...')
+      const randomSec = Math.floor(Math.random() * 23) + 40
+      setLoadingStep(`Searching for news sources ... ${randomSec}sec`)
       const response = await api.previewBrief(topic, country)
 
       if (response.success) {
@@ -90,7 +91,7 @@ export function HomePage() {
 
   const resetForm = () => {
     setTopic('')
-    setCountry('global')
+    setCountry('')
     setResult(null)
     setError(null)
     setEmail('')
@@ -140,7 +141,7 @@ export function HomePage() {
                 {/* Submit */}
                 <button
                   type="submit"
-                  disabled={!topic.trim()}
+                  disabled={!topic.trim() || !country.trim()}
                   className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-4 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-lg"
                 >
                   <Sparkles className="w-5 h-5" />

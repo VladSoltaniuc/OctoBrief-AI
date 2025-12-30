@@ -20,7 +20,6 @@ builder.Services.AddHttpClient("Scraper", client =>
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IScraperService, ScraperService>();
 builder.Services.AddScoped<IAiService, AiService>();
-builder.Services.AddScoped<INewsSearchService, NewsSearchService>();
 builder.Services.AddScoped<IBriefService, BriefService>();
 
 var app = builder.Build();

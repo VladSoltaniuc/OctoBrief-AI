@@ -1,6 +1,8 @@
 import { COUNTRIES } from '../constants'
 import { PreviewBriefResponse } from '../api'
 import { EmailSection } from './EmailSection'
+import parse from 'html-react-parser'
+import DOMPurify from 'dompurify'
 
 interface ResultsViewProps {
   result: PreviewBriefResponse
@@ -28,7 +30,11 @@ export function ResultsView({
   onReset,
 }: ResultsViewProps) {
   const countryLabel = COUNTRIES.find((c) => c.value === country)?.label || country
-  const successfulSources = result.websiteResults?.filter((w) => w.success).length || 0
+  const successfulSources = result.sources
+
+  // sanitize the HTML from the server and parse into React nodes
+  const sanitized = DOMPurify.sanitize(result.htmlContent || '')
+  const parsed = parse(sanitized)
 
   return (
     <div className="space-y-4">
@@ -52,11 +58,7 @@ export function ResultsView({
       </div>
 
       {/* News Cards */}
-      <div
-        className="news-grid"
-        // TODO: Improve
-        dangerouslySetInnerHTML={{ __html: result.htmlContent || '' }}
-      />
+      <div className="news-grid">{parsed}</div>
 
       {/* Email Section */}
       <EmailSection
