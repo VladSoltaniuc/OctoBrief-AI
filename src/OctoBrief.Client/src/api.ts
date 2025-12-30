@@ -7,7 +7,6 @@ import {
   AiTestResult,
   EmailTestResult,
   FullTestResult,
-  GenerateBriefResponse,
   PreviewBriefResponse,
   SendEmailResponse,
 } from './types'

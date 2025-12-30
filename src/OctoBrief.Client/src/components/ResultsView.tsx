@@ -54,6 +54,7 @@ export function ResultsView({
       {/* News Cards */}
       <div
         className="news-grid"
+        // TODO: Improve
         dangerouslySetInnerHTML={{ __html: result.htmlContent || '' }}
       />
 
